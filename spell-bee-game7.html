@@ -1,0 +1,889 @@
+<!--
+Spelling Bee Game Features:
+
+* **Kid-Friendly Design:** A vibrant, playful design with a new color palette, fun animations, and emojis to make the app feel like a game.
+* **Word List Selection:** Displays large, colorful alphabetical buttons to load specific word lists (e.g., words starting with 'A').
+* **Interactive Letter Buttons:** Clicking a letter button now toggles its "selected" state, changing its color. This also updates the custom input field.
+* **Custom Word List Input:** A new input box allows users to type multiple letters (e.g., 'acd') or use the buttons to load a combined quiz.
+* **Random Selection:** A new input and button allow users to randomly select a specified number of letters.
+* **Disabled Buttons:** Buttons for letters without a corresponding word list are disabled and styled differently. This is now handled by checking for the existence of corresponding .txt files via a fetch request.
+* **"All Words" Mode:** An additional button loads all available words from every list for a comprehensive quiz.
+* **Text-to-Speech:** Uses a specific "Google US English" voice to dictate words to the user.
+* **Interactive Quiz:** Users can type their spelling into an input box to check their answers.
+* **Sound Effects:** Plays a specific sound for correct and incorrect answers.
+* **Quiz Flow:** Allows users to repeat words, skip to the next word, and end the quiz early.
+* **Summary & Review:** At the end of the quiz, a summary shows which words were spelled correctly and incorrectly.
+* **Gamified Rewards:** Displays a cup, medal, or badge based on the user's score percentage.
+* **Changes in this version:** The layout for the custom list and random selection sections has been updated. On larger screens, the input boxes now take up 60% of the width, and the buttons take up 40%. The "Randomly Pick" section has been moved above the "Load" button.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spelling Adventure!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Balsamiq+Sans:wght@400;700&display=swap");
+      :root {
+        --primary-color: #6a67f5; /* A bright purple */
+        --secondary-color: #f7a372; /* A warm orange */
+        --tertiary-color: #9fcc34; /* A playful green */
+        --correct-color: #10b981;
+        --incorrect-color: #ef4444;
+        --background-color: #fce4ec; /* Light pink background */
+        --card-color: #ffffff;
+        --text-color: #334155;
+        --disabled-color: #d1d5db;
+      }
+
+      body {
+        font-family: "Balsamiq Sans", sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 1rem;
+      }
+
+      .container {
+        max-width: 600px;
+        width: 100%;
+        background-color: var(--card-color);
+        border-radius: 2rem;
+        box-shadow:
+          0 15px 25px -5px rgba(0, 0, 0, 0.2),
+          0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        border: 4px solid var(--primary-color);
+        position: relative;
+      }
+
+      h1 {
+        color: var(--primary-color);
+        -webkit-text-stroke: 1.5px #fff;
+        text-stroke: 1.5px #fff;
+      }
+
+      .button-primary {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 9999px;
+        font-weight: bold;
+        box-shadow: 0 4px var(--tertiary-color);
+        transition: all 0.1s ease-in-out;
+        cursor: pointer;
+      }
+      .button-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px var(--tertiary-color);
+      }
+      .button-primary:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px var(--tertiary-color);
+      }
+
+      .button-secondary {
+        background-color: var(--secondary-color);
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 9999px;
+        font-weight: bold;
+        box-shadow: 0 4px #e5734e; /* a darker shade of secondary */
+        transition: all 0.1s ease-in-out;
+        cursor: pointer;
+      }
+      .button-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px #e5734e;
+      }
+      .button-secondary:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px #e5734e;
+      }
+
+      /* New styles for the alphabetical letter buttons */
+      .letter-button {
+        font-family: "Balsamiq Sans", sans-serif;
+        font-weight: bold;
+        padding: 0.75rem;
+        border-radius: 9999px;
+        transition: all 0.1s ease-in-out;
+        box-shadow: 0 4px rgba(0, 0, 0, 0.2);
+      }
+      .letter-button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px rgba(0, 0, 0, 0.2);
+      }
+      .letter-button:active:not(:disabled) {
+        transform: translateY(2px);
+        box-shadow: 0 2px rgba(0, 0, 0, 0.2);
+      }
+
+      .selected-letter-btn {
+        background-color: var(--primary-color);
+        color: white;
+      }
+      .deselected-letter-btn {
+        background-color: var(--secondary-color);
+        color: white;
+      }
+
+      .button-disabled {
+        background-color: var(--disabled-color);
+        color: #6b7280;
+        cursor: not-allowed;
+        box-shadow: 0 2px #a3a3a3;
+      }
+      .button-disabled:hover,
+      .button-disabled:active {
+        transform: none;
+        box-shadow: 0 2px #a3a3a3;
+      }
+
+      .text-feedback {
+        font-size: 1.5rem;
+        font-weight: bold;
+        height: 2.5rem;
+        position: relative;
+      }
+      .correct {
+        color: var(--correct-color);
+        animation: bounceIn 0.5s ease-out;
+      }
+      .incorrect {
+        color: var(--incorrect-color);
+        animation: shake 0.5s ease-in-out;
+      }
+
+      @keyframes bounceIn {
+        0% {
+          transform: scale(0.5);
+          opacity: 0;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        20%,
+        60% {
+          transform: translateX(-5px);
+        }
+        40%,
+        80% {
+          transform: translateX(5px);
+        }
+      }
+
+      .word-display {
+        min-height: 4rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: bold;
+        color: var(--primary-color);
+        text-shadow: 2px 2px 0 #fff;
+      }
+
+      .input-text {
+        border: 3px solid var(--secondary-color);
+        background-color: #fef3e9;
+        color: var(--text-color);
+        padding: 1rem 1.5rem;
+        border-radius: 9999px;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s;
+      }
+      .input-text:focus {
+        border-color: var(--primary-color);
+        outline: none;
+        box-shadow:
+          inset 0 2px 4px rgba(0, 0, 0, 0.1),
+          0 0 0 3px rgba(106, 103, 245, 0.5);
+      }
+
+      .summary-list-item {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        text-align: left;
+      }
+      .summary-list-item span:first-child {
+        font-weight: bold;
+      }
+      .summary-list-item .incorrect-text {
+        color: var(--incorrect-color);
+        font-style: italic;
+      }
+      .reward-icon {
+        font-size: 4rem;
+        animation: float 2s ease-in-out infinite;
+      }
+      @keyframes float {
+        0% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-10px);
+        }
+        100% {
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="text-4xl font-bold mb-4">Spelling Quest! 🧙‍♀️</h1>
+
+      <div id="status-message" class="text-gray-500 mb-4">
+        Select a letter to begin your adventure!
+      </div>
+
+      <!-- New Alphabetical Button Section -->
+      <div id="word-list-buttons" class="w-full mb-6">
+        <div class="grid grid-cols-6 sm:grid-cols-7 gap-2 mb-4">
+          <!-- Alphabetical buttons will be dynamically added here by JS -->
+        </div>
+
+        <!-- New: Random selection input -->
+        <div
+          class="mt-6 flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-2 w-full"
+        >
+          <input
+            type="number"
+            id="random-letter-count"
+            placeholder="Number of random letters"
+            class="w-full md:w-3/5 text-center md:text-left input-text"
+            min="1"
+            value="2"
+          />
+          <button
+            id="random-select-button"
+            class="w-full md:w-2/5 button-secondary"
+          >
+            Randomly Pick 🎲
+          </button>
+        </div>
+
+        <!-- New: Custom file selection input -->
+        <div
+          class="mt-4 flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-2 w-full"
+        >
+          <input
+            type="text"
+            id="custom-list-input"
+            placeholder="Type letters or click above to select"
+            class="w-full md:w-3/5 text-center md:text-left input-text"
+          />
+          <button
+            id="load-custom-list-button"
+            class="w-full md:w-2/5 button-primary"
+          >
+            Load 🚀
+          </button>
+        </div>
+
+        <button id="all-words-button" class="w-full button-primary mt-4">
+          Load All Words 📚
+        </button>
+      </div>
+
+      <!-- Quiz Controls & Display -->
+      <div id="quiz-area" class="w-full hidden">
+        <div id="progress-counter" class="text-sm text-gray-500 mb-2"></div>
+        <div class="flex flex-col items-center mb-6">
+          <div id="word-display" class="word-display mb-4 text-center"></div>
+          <div id="feedback" class="text-feedback"></div>
+          <div id="detailed-feedback" class="text-xl font-bold mt-2"></div>
+        </div>
+
+        <!-- New: Spelling input box -->
+        <input
+          type="text"
+          id="spelling-input"
+          placeholder="Type your spelling here and press Enter"
+          class="w-full mb-4 text-center input-text"
+        />
+
+        <div class="grid grid-cols-2 gap-4 w-full">
+          <button id="next-button" class="button-primary">Let's Go! 👉</button>
+          <button id="repeat-button" class="button-secondary">
+            Repeat! 👂
+          </button>
+          <button id="end-quiz-button" class="col-span-2 button-secondary">
+            Give Up? 😭
+          </button>
+        </div>
+      </div>
+
+      <!-- New: Quiz Summary Section -->
+      <div id="summary-area" class="w-full hidden text-left">
+        <h2 class="text-2xl font-bold mb-4">You Finished the Quest! 🎉</h2>
+        <div
+          id="summary-score"
+          class="text-xl font-bold mb-2 text-center"
+        ></div>
+        <div id="summary-reward" class="text-center mb-4"></div>
+        <div id="summary-list" class="w-full"></div>
+        <button id="play-again-button" class="mt-6 w-full button-primary">
+          Play Again! 🥳
+        </button>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // Global variables to manage the state of the app
+        let wordList = [];
+        let currentWordIndex = 0;
+        let score = 0;
+        let isQuizActive = false;
+        let attemptedWords = 0; // Track total words attempted for the score
+        let missingFiles = []; // Track missing files for feedback
+
+        // We'll use this object to store the word lists that have been successfully fetched.
+        let availableWordLists = {};
+
+        // Sound effects using Tone.js
+        const correctSynth = new Tone.Synth({
+          oscillator: { type: "triangle" },
+          envelope: { attack: 0.05, decay: 0.1, sustain: 0.1, release: 0.1 },
+        }).toDestination();
+        const incorrectSynth = new Tone.NoiseSynth({
+          noise: { type: "white" },
+          envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 },
+        }).toDestination();
+
+        // UI elements
+        const statusMessage = document.getElementById("status-message");
+        const wordListButtons = document.getElementById("word-list-buttons");
+        const allWordsButton = document.getElementById("all-words-button");
+        const quizArea = document.getElementById("quiz-area");
+        const progressCounter = document.getElementById("progress-counter");
+        const nextButton = document.getElementById("next-button");
+        const repeatButton = document.getElementById("repeat-button");
+        const endQuizButton = document.getElementById("end-quiz-button");
+        const wordDisplay = document.getElementById("word-display");
+        const feedback = document.getElementById("feedback");
+        const spellingInput = document.getElementById("spelling-input");
+        const detailedFeedback = document.getElementById("detailed-feedback");
+
+        // New UI elements for custom input, random selection, and summary
+        const customListInput = document.getElementById("custom-list-input");
+        const loadCustomListButton = document.getElementById(
+          "load-custom-list-button",
+        );
+        const randomLetterCountInput = document.getElementById(
+          "random-letter-count",
+        );
+        const randomSelectButton = document.getElementById(
+          "random-select-button",
+        );
+        const summaryArea = document.getElementById("summary-area");
+        const summaryList = document.getElementById("summary-list");
+        const summaryScore = document.getElementById("summary-score");
+        const summaryReward = document.getElementById("summary-reward");
+        const playAgainButton = document.getElementById("play-again-button");
+
+        // This Set will track the letters selected by the user for the custom list
+        let selectedLetters = new Set();
+
+        // Speech Synthesis (Text-to-Speech)
+        const synth = window.speechSynthesis;
+
+        /**
+         * Fetches a word list from a text file and returns it as an array.
+         * @param {string} letter - The letter corresponding to the file (e.g., 'A' for A.txt).
+         * @returns {Promise<Array<string>|null>} A promise that resolves to an array of words or null if the file is not found.
+         */
+        async function fetchWordList(letter) {
+          try {
+            const response = await fetch(`${letter}.txt`);
+            if (!response.ok) {
+              // If the file doesn't exist, response.ok will be false (e.g., 404 error)
+              throw new Error(`File not found: ${letter}.txt`);
+            }
+            const text = await response.text();
+            // Split the text into an array, filter out any empty lines, and trim whitespace
+            return text
+              .split("\n")
+              .filter((word) => word.trim() !== "")
+              .map((word) => word.trim());
+          } catch (error) {
+            console.error(error);
+            return null;
+          }
+        }
+
+        /**
+         * Initializes the alphabetical buttons by checking for the existence of each .txt file.
+         */
+        async function initializeButtons() {
+          const alphabetContainer = document.querySelector(
+            "#word-list-buttons > div",
+          );
+          const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+          // Use a promise to track when all checks are complete
+          const fetchPromises = alphabet.map((letter) => {
+            return fetchWordList(letter).then((words) => {
+              if (words) {
+                availableWordLists[letter] = words;
+              }
+            });
+          });
+
+          // Wait for all fetch requests to complete before building the UI
+          await Promise.allSettled(fetchPromises);
+
+          alphabet.forEach((letter) => {
+            const button = document.createElement("button");
+            button.textContent = letter;
+
+            // Add the base class for styling
+            button.classList.add("letter-button");
+
+            if (availableWordLists[letter]) {
+              // Button is enabled if a word list exists
+              button.classList.add("deselected-letter-btn");
+              button.addEventListener("click", () => {
+                // Toggle the selected state
+                if (selectedLetters.has(letter)) {
+                  selectedLetters.delete(letter);
+                  button.classList.remove("selected-letter-btn");
+                  button.classList.add("deselected-letter-btn");
+                } else {
+                  selectedLetters.add(letter);
+                  button.classList.add("selected-letter-btn");
+                  button.classList.remove("deselected-letter-btn");
+                }
+                // Update the custom input box
+                const sortedLetters = Array.from(selectedLetters).sort();
+                customListInput.value = sortedLetters.join("");
+              });
+            } else {
+              // Button is disabled with different styling
+              button.classList.add("button-disabled");
+              button.disabled = true;
+            }
+            alphabetContainer.appendChild(button);
+          });
+        }
+
+        /**
+         * Announces a given word using Text-to-Speech.
+         * @param {string} word - The word to be spoken.
+         */
+        function announceWord(word) {
+          if (synth.speaking) {
+            console.error("speechSynthesis.speaking");
+            return;
+          }
+          if (word !== "") {
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.rate = 0.8; // A slightly slower pace for clarity
+            utterance.pitch = 1.0;
+
+            const voices = synth.getVoices();
+            const friendlyVoice = voices.find((voice) =>
+              voice.name.includes("Google US English"),
+            );
+            if (friendlyVoice) {
+              utterance.voice = friendlyVoice;
+            }
+
+            synth.speak(utterance);
+          }
+        }
+
+        /**
+         * Shuffles an array in place using the Fisher-Yates algorithm.
+         * @param {Array} array - The array to shuffle.
+         */
+        function shuffleArray(array) {
+          for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+          }
+        }
+
+        /**
+         * Initializes the quiz with a given set of words.
+         * @param {Array<string>} words - The array of words to be used in the quiz.
+         */
+        function loadAndStartQuiz(words, missing = []) {
+          if (!words || words.length === 0) {
+            statusMessage.textContent = "No words found for this selection. 🙁";
+            return;
+          }
+
+          wordList = words.map((word) => ({
+            word: word,
+            correct: null,
+            spelledWord: "",
+          }));
+
+          let initialMessage = `Successfully loaded ${wordList.length} words! Let's get spelling! ✨`;
+          if (missing.length > 0) {
+            initialMessage += ` (Could not find lists for: ${missing.join(", ")}.)`;
+          }
+          statusMessage.textContent = initialMessage;
+
+          quizArea.classList.remove("hidden");
+          wordListButtons.classList.add("hidden");
+
+          currentWordIndex = 0;
+          score = 0;
+          attemptedWords = 0;
+          shuffleArray(wordList);
+          wordDisplay.textContent = "Ready to begin?";
+          feedback.textContent = "";
+          detailedFeedback.innerHTML = "";
+          progressCounter.textContent = `Word 1 of ${wordList.length}`;
+          nextButton.textContent = "Let's Go! 👉"; // Reset button text for a new quiz
+          spellingInput.focus();
+        }
+
+        /**
+         * Handles the next word logic. Announces the next word.
+         */
+        function getNextWord() {
+          // Only get the next word if the quiz isn't over.
+          if (currentWordIndex < wordList.length) {
+            const currentWord = wordList[currentWordIndex].word;
+            wordDisplay.textContent = "...";
+            feedback.textContent = "";
+            detailedFeedback.innerHTML = ""; // Clear detailed feedback
+            spellingInput.value = ""; // Clear the input box for the next word
+            progressCounter.textContent = `Word ${currentWordIndex + 1} of ${wordList.length}`;
+            // Delay the announcement slightly for a better user experience
+            setTimeout(() => {
+              announceWord(currentWord);
+              spellingInput.focus();
+            }, 500);
+          }
+        }
+
+        /**
+         * Displays the quiz summary.
+         */
+        function showSummary() {
+          isQuizActive = false; // Ensure quiz is marked as inactive
+          quizArea.classList.add("hidden");
+          summaryArea.classList.remove("hidden");
+          summaryList.innerHTML = ""; // Clear previous summary
+          summaryScore.innerHTML = "";
+          summaryReward.innerHTML = "";
+
+          // Filter for words that were actually attempted
+          const attemptedItems = wordList.filter(
+            (item) => item.correct !== null,
+          );
+          const attemptedCount = attemptedItems.length;
+          const correctCount = attemptedItems.filter(
+            (item) => item.correct === true,
+          ).length;
+
+          if (attemptedCount > 0) {
+            summaryScore.textContent = `${correctCount}/${attemptedCount} words attempted are correct!`;
+            const percentage = (correctCount / attemptedCount) * 100;
+            let rewardText = "";
+            let rewardIcon = "";
+
+            if (percentage === 100) {
+              rewardIcon = "🏆";
+              rewardText = "Perfect score! You earned a cup!";
+            } else if (percentage >= 80) {
+              rewardIcon = "🥇";
+              rewardText = "Great job! You earned a medal!";
+            } else if (percentage >= 70) {
+              rewardIcon = "🏅";
+              rewardText = "Nice try! You earned a badge!";
+            }
+
+            if (rewardIcon) {
+              summaryReward.innerHTML = `<span class="reward-icon">${rewardIcon}</span><br><span class="text-lg font-bold">${rewardText}</span>`;
+            } else {
+              summaryReward.innerHTML = `<span class="text-sm text-gray-600">You need to score 70% or higher to earn a reward! Keep trying! </span>`;
+            }
+          } else {
+            summaryScore.textContent = "No words were attempted. Try again! 🤔";
+          }
+
+          wordList.forEach((item) => {
+            // Only show words that were attempted
+            if (item.correct !== null) {
+              const resultItem = document.createElement("div");
+              resultItem.className = `summary-list-item`;
+
+              const wordSpan = document.createElement("span");
+              wordSpan.textContent = item.word;
+              const isCorrect = item.correct === true;
+              wordSpan.className = isCorrect
+                ? "text-green-500"
+                : "text-red-500";
+
+              const incorrectSpan = document.createElement("span");
+              if (!isCorrect && item.spelledWord) {
+                incorrectSpan.textContent = item.spelledWord;
+                incorrectSpan.className = "incorrect-text";
+              }
+
+              resultItem.appendChild(wordSpan);
+              resultItem.appendChild(incorrectSpan);
+              summaryList.appendChild(resultItem);
+            }
+          });
+        }
+
+        /**
+         * Resets the app state to start a new quiz.
+         */
+        function resetApp() {
+          // Clear all state
+          wordList = [];
+          currentWordIndex = 0;
+          score = 0;
+          isQuizActive = false;
+          attemptedWords = 0;
+          missingFiles = [];
+          selectedLetters.clear();
+
+          // Reset UI visibility and button state
+          summaryArea.classList.add("hidden");
+          quizArea.classList.add("hidden");
+          wordListButtons.classList.remove("hidden");
+          statusMessage.textContent =
+            "Select a letter to begin your adventure!";
+          customListInput.value = "";
+          // Re-render buttons to reset their state
+          const alphabetContainer = document.querySelector(
+            "#word-list-buttons > div",
+          );
+          alphabetContainer.innerHTML = "";
+          initializeButtons();
+        }
+
+        /**
+         * Checks the user's spoken word against the correct spelling.
+         * @param {string} userSpelling - The word transcribed from the user's voice.
+         */
+        function checkSpelling(userSpelling) {
+          if (currentWordIndex >= wordList.length) return;
+
+          const currentWord = wordList[currentWordIndex].word.toLowerCase();
+
+          if (wordList[currentWordIndex].correct === null) {
+            attemptedWords++;
+          }
+
+          if (userSpelling === currentWord) {
+            feedback.textContent = "Correct! ✅";
+            feedback.className = "text-feedback correct";
+            detailedFeedback.innerHTML = "";
+            correctSynth.triggerAttackRelease("C4", "8n");
+
+            wordList[currentWordIndex].correct = true;
+            wordList[currentWordIndex].spelledWord = userSpelling;
+            score++;
+
+            if (currentWordIndex === wordList.length - 1) {
+              setTimeout(() => showSummary(), 1500);
+            } else {
+              setTimeout(() => {
+                currentWordIndex++;
+                getNextWord();
+              }, 1500);
+            }
+          } else {
+            feedback.textContent = "Incorrect. ❌";
+            feedback.className = "text-feedback incorrect";
+            detailedFeedback.innerHTML = ``; // Clear the detailed feedback, no hints
+            incorrectSynth.triggerAttackRelease("4n");
+            wordList[currentWordIndex].correct = false;
+            wordList[currentWordIndex].spelledWord = userSpelling;
+
+            setTimeout(() => {
+              announceWord(currentWord);
+            }, 1000);
+          }
+        }
+
+        // Event Listeners
+
+        // Call the async function to initialize buttons on page load
+        initializeButtons();
+
+        // Event listener for the "All Words" button
+        allWordsButton.addEventListener("click", () => {
+          let allWords = [];
+          for (const letter in availableWordLists) {
+            allWords = allWords.concat(availableWordLists[letter]);
+          }
+          loadAndStartQuiz(allWords);
+        });
+
+        // Event listener for the custom list button
+        loadCustomListButton.addEventListener("click", async () => {
+          const inputString = customListInput.value.trim().toUpperCase();
+          if (!inputString) {
+            statusMessage.textContent = "Please enter one or more letters. 🤨";
+            return;
+          }
+
+          let uniqueLetters = [
+            ...new Set(
+              inputString
+                .split("")
+                .filter((char) => char >= "A" && char <= "Z"),
+            ),
+          ];
+
+          let combinedWords = [];
+          let missing = [];
+
+          // Check if word lists are already available from the initial fetch
+          const loadPromises = uniqueLetters.map(async (letter) => {
+            if (availableWordLists[letter]) {
+              combinedWords = combinedWords.concat(availableWordLists[letter]);
+            } else {
+              // Try to fetch it on demand if it wasn't there initially
+              const words = await fetchWordList(letter);
+              if (words) {
+                combinedWords = combinedWords.concat(words);
+              } else {
+                missing.push(letter);
+              }
+            }
+          });
+
+          await Promise.all(loadPromises);
+
+          loadAndStartQuiz(combinedWords, missing);
+        });
+
+        // Event listener for the new random selection button
+        randomSelectButton.addEventListener("click", () => {
+          const count = parseInt(randomLetterCountInput.value);
+          if (isNaN(count) || count < 1) {
+            statusMessage.textContent =
+              "Please enter a valid number of letters. 🔢";
+            return;
+          }
+
+          const availableLetters = Object.keys(availableWordLists);
+          if (availableLetters.length === 0) {
+            statusMessage.textContent =
+              "No word lists are available to select from. 🤷‍♀️";
+            return;
+          }
+
+          shuffleArray(availableLetters);
+          const selectedLettersArray = availableLetters.slice(
+            0,
+            Math.min(count, availableLetters.length),
+          );
+
+          // Update the input and the Set
+          customListInput.value = selectedLettersArray.sort().join("");
+          selectedLetters = new Set(selectedLettersArray);
+
+          // Update button visuals
+          document.querySelectorAll(".letter-button").forEach((btn) => {
+            const letter = btn.textContent;
+            if (selectedLetters.has(letter)) {
+              btn.classList.add("selected-letter-btn");
+              btn.classList.remove("deselected-letter-btn");
+            } else if (!btn.disabled) {
+              btn.classList.remove("selected-letter-btn");
+              btn.classList.add("deselected-letter-btn");
+            }
+          });
+
+          statusMessage.textContent = `Randomly selected ${selectedLetters.size} letters. Click 'Load' to start the quiz! 🤩`;
+        });
+
+        spellingInput.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && isQuizActive) {
+            const typedWord = spellingInput.value.trim().toLowerCase();
+            if (typedWord) {
+              checkSpelling(typedWord);
+            }
+          }
+        });
+
+        nextButton.addEventListener("click", () => {
+          // If the quiz hasn't started, start it
+          if (!isQuizActive) {
+            isQuizActive = true;
+            nextButton.textContent = "Next Word! ➡️";
+            getNextWord();
+            return;
+          }
+
+          // Mark the current word as incorrect before skipping
+          if (currentWordIndex < wordList.length) {
+            if (wordList[currentWordIndex].correct === null) {
+              wordList[currentWordIndex].correct = false; // Mark unattempted words as incorrect on skip
+              wordList[currentWordIndex].spelledWord = "skipped";
+              attemptedWords++;
+            }
+            currentWordIndex++;
+          }
+
+          if (currentWordIndex >= wordList.length) {
+            showSummary();
+          } else {
+            getNextWord();
+          }
+        });
+
+        repeatButton.addEventListener("click", () => {
+          if (isQuizActive && currentWordIndex < wordList.length) {
+            announceWord(wordList[currentWordIndex].word);
+          }
+        });
+
+        endQuizButton.addEventListener("click", () => {
+          // Check if there's a word currently being processed. If so, mark it as incorrect.
+          if (
+            isQuizActive &&
+            currentWordIndex < wordList.length &&
+            wordList[currentWordIndex].correct === null
+          ) {
+            wordList[currentWordIndex].correct = false;
+            wordList[currentWordIndex].spelledWord = "skipped";
+            attemptedWords++;
+          }
+          showSummary();
+        });
+
+        playAgainButton.addEventListener("click", resetApp);
+      });
+    </script>
+  </body>
+</html>
