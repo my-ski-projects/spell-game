@@ -607,58 +607,20 @@ Spelling Bee Game Features:
           });
         }
 
+        let prefetchedAudio = {};
+
         /**
-         * Announces a given word using Text-to-Speech.
-         * @param {string} word - The word to be spoken.
+         * Prefetches pronunciation audio for a word and stores it in prefetchedAudio.
+         * @param {string} word
          */
-        /** function announceWord(word) {
-          // Fix: Ensure the voice is not already speaking before trying to announce
-          if (synth.speaking) {
-            synth.cancel(); // Cancel any current utterance
-          }
-
-          if (word !== "") {
-            const utterance = new SpeechSynthesisUtterance(word);
-
-            // Set the speaking rate and pitch as requested.
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
-
-            // Find and use a specific high-quality voice for a better user experience
-            const voices = synth.getVoices();
-            const friendlyVoice = voices.find((voice) =>
-              voice.name.includes("Google US English"),
-            );
-
-            // Set the voice if found, otherwise use the browser's default
-            if (friendlyVoice) {
-              utterance.voice = friendlyVoice;
-            }
-
-            synth.speak(utterance);
-          }
-        } **/
-
-        // ...existing code...
-        /**
-         * Announces a given word using the Free Dictionary API's pronunciation audio.
-         * Falls back to browser TTS if no audio is available.
-         * @param {string} word - The word to be spoken.
-         */
-        async function announceWord(word) {
-          // Cancel any ongoing speech
-          if (synth.speaking) synth.cancel();
-
-          if (!word) return;
-
-          // Try to fetch pronunciation audio from the dictionary API
+        async function prefetchAudio(word) {
+          if (!word || prefetchedAudio[word]) return;
           try {
             const response = await fetch(
               `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`
             );
             if (response.ok) {
               const data = await response.json();
-              // Find the first available audio pronunciation
               let audioUrl = null;
               if (data && data[0] && data[0].phonetics) {
                 const phonetic = data[0].phonetics.find((p) => p.audio);
@@ -667,9 +629,52 @@ Spelling Bee Game Features:
                 }
               }
               if (audioUrl) {
-                // Play the audio using HTML5 Audio
+                const audio = new Audio(audioUrl);
+                // Preload the audio
+                audio.preload = "auto";
+                prefetchedAudio[word] = audio;
+              }
+            }
+          } catch (e) {
+            // Ignore errors, fallback will be used
+          }
+        }
+
+        /**
+         * Announces a given word using prefetched audio if available, otherwise fetches and plays.
+         * Falls back to browser TTS if no audio is available.
+         * @param {string} word - The word to be spoken.
+         */
+        async function announceWord(word) {
+          if (synth.speaking) synth.cancel();
+          if (!word) return;
+
+          // Use prefetched audio if available
+          if (prefetchedAudio[word]) {
+            prefetchedAudio[word].currentTime = 0;
+            prefetchedAudio[word].play();
+            return;
+          }
+
+          // Try to fetch and play audio if not prefetched
+          try {
+            const response = await fetch(
+              `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`
+            );
+            if (response.ok) {
+              const data = await response.json();
+              let audioUrl = null;
+              if (data && data[0] && data[0].phonetics) {
+                const phonetic = data[0].phonetics.find((p) => p.audio);
+                if (phonetic && phonetic.audio) {
+                  audioUrl = phonetic.audio;
+                }
+              }
+              if (audioUrl) {
                 const audio = new Audio(audioUrl);
                 audio.play();
+                // Optionally cache for future use
+                prefetchedAudio[word] = audio;
                 return;
               }
             }
@@ -727,6 +732,11 @@ Spelling Bee Game Features:
             spelledWord: "",
           }));
 
+          // Prefetch audio for the first 3 words
+          for (let i = 0; i < Math.min(3, wordList.length); i++) {
+            prefetchAudio(wordList[i].word);
+          }
+
           let initialMessage = `Successfully loaded ${wordList.length} words! Let's get spelling! ✨`;
           if (missing.length > 0) {
             initialMessage += ` (Could not find lists for: ${missing.join(
@@ -778,6 +788,11 @@ Spelling Bee Game Features:
             setTimeout(() => {
               announceWord(currentWord);
               spellingInput.focus();
+
+              // Prefetch audio for the next word
+              if (currentWordIndex + 1 < wordList.length) {
+                prefetchAudio(wordList[currentWordIndex + 1].word);
+              }
             }, 500);
           } else {
             showSummary();
