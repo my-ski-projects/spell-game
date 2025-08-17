@@ -1,4 +1,26 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Listen for keydown event to show user-id input if 0 is pressed on initial screen
+    document.addEventListener('keydown', function(e) {
+        // Only on initial screen (quiz not started)
+        if (!isQuizActive && e.key === '0') {
+            const userIdInput = document.getElementById('user-id-input');
+            if (userIdInput) {
+                userIdInput.style.display = '';
+                userIdInput.focus();
+            }
+        }
+    });
+    // Default user to 'fox' and hide the user-id input box
+    window.currentUser = 'fox';
+    const userIdInput = document.getElementById('user-id-input');
+    if (userIdInput) {
+        userIdInput.value = 'fox';
+        userIdInput.style.display = 'none';
+    }
+    // If you have a function to initialize Supabase, call it here
+    if (typeof initSupabase === 'function') {
+        initSupabase('fox');
+    }
     // Robust event listeners for repeat buttons (moved from index.html)
     function getCurrentWord() {
         if (
@@ -385,27 +407,30 @@ document.addEventListener("DOMContentLoaded", () => {
             summaryScore.textContent = "No words were attempted. Try again! 🤔";
         }
 
+        // Create a table for summary with alternating row colors
+        let tableHtml = `<table style=\"width:100%;border-collapse:collapse;\">` +
+            `<thead><tr><th style='border-bottom:2px solid #ccc;padding:6px 4px;text-align:left;'>Word</th><th style='border-bottom:2px solid #ccc;padding:6px 4px;text-align:left;'>Input</th></tr></thead><tbody>`;
+        let rowIndex = 0;
         wordList.forEach((item) => {
-            // Only show words that were attempted
             if (item.correct !== null) {
-                const resultItem = document.createElement("div");
-                resultItem.className = `summary-list-item`;
-
-                const wordSpan = document.createElement("span");
-                wordSpan.textContent = item.word;
                 const isCorrect = item.correct === true;
-                wordSpan.className = isCorrect ? "text-green-500" : "text-red-500";
-
-                const incorrectSpan = document.createElement("span");
-                if (!isCorrect && item.spelledWord) {
-                    incorrectSpan.textContent = item.spelledWord;
-                    incorrectSpan.className = "incorrect-text";
+                const bgColor = rowIndex % 2 === 0 ? "#f8f8ff" : "#f0f4fa";
+                const wordCell = `<td style='padding:6px 4px;${isCorrect ? "color:#10b981;" : "color:#ef4444;"}font-weight:bold;'>${item.word}</td>`;
+                let inputCell = "<td style='padding:6px 4px;'>";
+                if (isCorrect) {
+                    inputCell += `<span style='color:#10b981;font-weight:bold;'>${item.word}</span>`;
+                } else if (item.spelledWord) {
+                    inputCell += `<span style='color:#ef4444;font-style:italic;'>${item.spelledWord}</span>`;
+                } else {
+                    inputCell += `<span style='color:#888;'>skipped</span>`;
                 }
-                resultItem.appendChild(wordSpan);
-                resultItem.appendChild(incorrectSpan);
-                summaryList.appendChild(resultItem);
+                inputCell += "</td>";
+                tableHtml += `<tr style='background:${bgColor};'>${wordCell}${inputCell}</tr>`;
+                rowIndex++;
             }
         });
+        tableHtml += `</tbody></table>`;
+        summaryList.innerHTML = tableHtml;
     }
 
     /**
@@ -519,15 +544,20 @@ document.addEventListener("DOMContentLoaded", () => {
     // Batch save all misspelled words to Supabase at the end of the quiz
     function batchSaveMisspelledWords() {
         if (typeof saveMisspelledWordsBatch === 'function' && typeof currentUser !== 'undefined' && currentUser) {
-            // Collect all incorrect words and their counts for this session
+            // Collect all incorrect words, their counts, and wrong spellings for this session
             const misspelledMap = {};
             wordList.forEach(item => {
                 if (item.correct === false && item.word) {
-                    if (!misspelledMap[item.word]) misspelledMap[item.word] = 0;
-                    misspelledMap[item.word]++;
+                    if (!misspelledMap[item.word]) {
+                        misspelledMap[item.word] = { count: 0, wrongSpellings: [] };
+                    }
+                    misspelledMap[item.word].count++;
+                    if (item.spelledWord && item.spelledWord !== 'skipped') {
+                        misspelledMap[item.word].wrongSpellings.push(item.spelledWord);
+                    }
                 }
             });
-            const misspelledArray = Object.entries(misspelledMap).map(([word, count]) => ({ word, count }));
+            const misspelledArray = Object.entries(misspelledMap).map(([word, obj]) => ({ word, count: obj.count, wrongSpellings: obj.wrongSpellings }));
             if (misspelledArray.length > 0) {
                 saveMisspelledWordsBatch(misspelledArray);
             }

@@ -9,27 +9,48 @@ async function saveMisspelledWordsBatch(misspelledArray) {
         console.error('Supabase not initialized or missing user.');
         return;
     }
-    for (const { word, count } of misspelledArray) {
-        // Step 1: Check if word already exists
+    for (const { word, count, wrongSpellings } of misspelledArray) {
+        // Step 1: Check if word already exists and get current mistake_count and wrong_spell
         const { data, error } = await supabase
             .from('misspelled_words')
-            .select('mistake_count')
+            .select('mistake_count, wrong_spell')
             .eq('user_id', currentUser)
             .eq('word', word)
             .single();
 
         let mistakeCount = count;
+        let wrongSpell = '';
         if (data) {
             mistakeCount = data.mistake_count + count;
+            wrongSpell = data.wrong_spell || '';
         }
 
-        // Step 2: Insert or update with incremented count
+        // Prepare new wrong_spell value (append new wrong spellings, comma separated)
+        let newWrongSpell = '';
+        if (wrongSpell && wrongSpellings && wrongSpellings.length > 0) {
+            // Existing record: append new unique wrong spellings
+            const existingSet = new Set(wrongSpell.split(',').map(s => s.trim()).filter(Boolean));
+            const toAdd = wrongSpellings.filter(s => !existingSet.has(s));
+            if (toAdd.length > 0) {
+                newWrongSpell = wrongSpell ? (wrongSpell + ',' + toAdd.join(',')) : toAdd.join(',');
+            } else {
+                newWrongSpell = wrongSpell;
+            }
+        } else if (!wrongSpell && wrongSpellings && wrongSpellings.length > 0) {
+            // New record: just join the wrong spellings
+            newWrongSpell = wrongSpellings.join(',');
+        } else {
+            newWrongSpell = wrongSpell;
+        }
+
+        // Step 2: Insert or update with incremented count and wrong_spell
         const { error: upsertError } = await supabase
             .from('misspelled_words')
             .upsert({
                 user_id: currentUser,
                 word: word,
-                mistake_count: mistakeCount
+                mistake_count: mistakeCount,
+                wrong_spell: newWrongSpell
             }, {
                 onConflict: ['user_id', 'word']
             });
@@ -37,7 +58,7 @@ async function saveMisspelledWordsBatch(misspelledArray) {
         if (upsertError) {
             console.error('Upsert error:', upsertError.message);
         } else {
-            console.log(`Batch saved "${word}" for ${currentUser} with count ${mistakeCount}`);
+            console.log(`Batch saved "${word}" for ${currentUser} with count ${mistakeCount} and wrong_spell: ${newWrongSpell}`);
         }
     }
 }
