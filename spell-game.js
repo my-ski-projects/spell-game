@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Show userId input on key '0' (zero) if not already visible, and prevent passing keystroke to input
     document.addEventListener('keydown', function (e) {
-        if (e.key === '0' && userIdInput) {
+        if (e.key === '`' && userIdInput) {
             if (userIdInput.style.display === 'none') {
                 userIdInput.style.display = '';
                 userIdInput.focus();
