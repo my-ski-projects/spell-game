@@ -92,6 +92,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 if (typeof announceWordWithDictApi === "function")
                     announceWordWithDictApi(word);
+                if (typeof spellingInput !== 'undefined' && spellingInput && typeof spellingInput.focus === 'function') {
+                    spellingInput.focus();
+                }
             };
         }
         if (repeatTtsBtn) {
@@ -104,6 +107,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
                 if (typeof announceWordWithTTS === "function")
                     announceWordWithTTS(word);
+                if (typeof spellingInput !== 'undefined' && spellingInput && typeof spellingInput.focus === 'function') {
+                    spellingInput.focus();
+                }
             };
         }
     }
