@@ -1,26 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // Listen for keydown event to show user-id input if 0 is pressed on initial screen
-    document.addEventListener('keydown', function(e) {
-        // Only on initial screen (quiz not started)
-        if (!isQuizActive && e.key === '0') {
-            const userIdInput = document.getElementById('user-id-input');
-            if (userIdInput) {
-                userIdInput.style.display = '';
-                userIdInput.focus();
-            }
-        }
-    });
-    // Default user to 'fox' and hide the user-id input box
-    window.currentUser = 'fox';
-    const userIdInput = document.getElementById('user-id-input');
-    if (userIdInput) {
-        userIdInput.value = 'fox';
-        userIdInput.style.display = 'none';
-    }
-    // If you have a function to initialize Supabase, call it here
-    if (typeof initSupabase === 'function') {
-        initSupabase('fox');
-    }
+    // (Reverted: No default user, no auto-hide, no auto-init)
     // Robust event listeners for repeat buttons (moved from index.html)
     function getCurrentWord() {
         if (
@@ -286,6 +265,16 @@ document.addEventListener("DOMContentLoaded", () => {
      * @param {Array<string>} missing - An array of letters for which word lists were not found.
      */
     function loadAndStartQuiz(words, missing = []) {
+        // Set currentUser and initialize Supabase for DB updates
+        const userIdInput = document.getElementById('user-id-input');
+        if (userIdInput && userIdInput.value.trim()) {
+            window.currentUser = userIdInput.value.trim();
+            if (typeof initSupabase === 'function') {
+                initSupabase(window.currentUser);
+            }
+        } else {
+            window.currentUser = undefined;
+        }
         if (!words || words.length === 0) {
             statusMessage.textContent = "No words found for this selection. 🙁";
             return;
