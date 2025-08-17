@@ -254,6 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!word) { console.log('[announceWordWithDictApi] No word provided'); return; }
         // Cancel any ongoing speech
         if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+        let didPlayAudio = false;
         try {
             const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
             if (response.ok) {
@@ -269,6 +270,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.log('[announceWordWithDictApi] Playing audio:', audioUrl);
                     const audio = new Audio(audioUrl);
                     audio.play().catch(e => { console.log('Audio play error:', e); });
+                    didPlayAudio = true;
                     return;
                 } else {
                     console.log('[announceWordWithDictApi] No audio found in API response for', word);
@@ -279,7 +281,10 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (e) {
             console.log('[announceWordWithDictApi] Fetch error:', e);
         }
-        // If no audio found, do nothing (no TTS fallback)
+        // Fallback to TTS if no audio was played
+        if (!didPlayAudio && typeof announceWordWithTTS === 'function') {
+            announceWordWithTTS(word);
+        }
     }
 
     /**
