@@ -1,4 +1,59 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Robust event listeners for repeat buttons (moved from index.html)
+    function getCurrentWord() {
+        if (
+            window.wordList &&
+            typeof window.currentWordIndex === "number" &&
+            window.currentWordIndex < window.wordList.length
+        ) {
+            return window.wordList[window.currentWordIndex].word;
+        }
+        // Fallback: try to get from quiz area
+        const quizArea = document.getElementById("quiz-area");
+        if (quizArea && !quizArea.classList.contains("hidden")) {
+            const wordDisplay = document.getElementById("word-display");
+            if (
+                wordDisplay &&
+                wordDisplay.textContent &&
+                wordDisplay.textContent !== "..."
+            ) {
+                return wordDisplay.textContent.trim();
+            }
+        }
+        return "";
+    }
+    function setupRepeatButtons() {
+        const repeatDictApiBtn = document.getElementById("repeat-dictapi-button");
+        const repeatTtsBtn = document.getElementById("repeat-tts-button");
+        if (repeatDictApiBtn) {
+            repeatDictApiBtn.onclick = function () {
+                const word = getCurrentWord();
+                console.log("[Repeat-DictApi] Clicked. Word:", word);
+                if (!word) {
+                    alert("No word to repeat!");
+                    return;
+                }
+                if (typeof announceWordWithDictApi === "function")
+                    announceWordWithDictApi(word);
+            };
+        }
+        if (repeatTtsBtn) {
+            repeatTtsBtn.onclick = function () {
+                const word = getCurrentWord();
+                console.log("[Repeat-TTS] Clicked. Word:", word);
+                if (!word) {
+                    alert("No word to repeat!");
+                    return;
+                }
+                if (typeof announceWordWithTTS === "function")
+                    announceWordWithTTS(word);
+            };
+        }
+    }
+    setupRepeatButtons();
+    // In case quiz area is re-rendered, re-setup buttons
+    const observer = new MutationObserver(setupRepeatButtons);
+    observer.observe(document.body, { childList: true, subtree: true });
     // Global variables to manage the state of the app
     let wordList = [];
     let currentWordIndex = 0;
@@ -133,92 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    let prefetchedAudio = {};
-
-    /**
-     * Prefetches pronunciation audio for a word and stores it in prefetchedAudio.
-     * @param {string} word
-     */
-    async function prefetchAudio(word) {
-        if (!word || prefetchedAudio[word]) return;
-        try {
-            const response = await fetch(
-                `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                let audioUrl = null;
-                if (data && data[0] && data[0].phonetics) {
-                    const phonetic = data[0].phonetics.find((p) => p.audio);
-                    if (phonetic && phonetic.audio) {
-                        audioUrl = phonetic.audio;
-                    }
-                }
-                if (audioUrl) {
-                    const audio = new Audio(audioUrl);
-                    // Preload the audio
-                    audio.preload = "auto";
-                    prefetchedAudio[word] = audio;
-                }
-            }
-        } catch (e) {
-            // Ignore errors, fallback will be used
-        }
-    }
-
-    /**
-     * Announces a given word using prefetched audio if available, otherwise fetches and plays.
-     * Falls back to browser TTS if no audio is available.
-     * @param {string} word - The word to be spoken.
-     */
-    async function announceWord(word) {
-        if (synth.speaking) synth.cancel();
-        if (!word) return;
-
-        // Use prefetched audio if available
-        if (prefetchedAudio[word]) {
-            prefetchedAudio[word].currentTime = 0;
-            prefetchedAudio[word].play();
-            return;
-        }
-
-        // Try to fetch and play audio if not prefetched
-        try {
-            const response = await fetch(
-                `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`
-            );
-            if (response.ok) {
-                const data = await response.json();
-                let audioUrl = null;
-                if (data && data[0] && data[0].phonetics) {
-                    const phonetic = data[0].phonetics.find((p) => p.audio);
-                    if (phonetic && phonetic.audio) {
-                        audioUrl = phonetic.audio;
-                    }
-                }
-                if (audioUrl) {
-                    const audio = new Audio(audioUrl);
-                    audio.play();
-                    // Optionally cache for future use
-                    prefetchedAudio[word] = audio;
-                    return;
-                }
-            }
-        } catch (e) {
-            // Ignore and fall back to TTS
-        }
-
-        // Fallback: Use browser TTS if no audio found
-        const utterance = new SpeechSynthesisUtterance(word);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        const voices = synth.getVoices();
-        const friendlyVoice = voices.find((voice) =>
-            voice.name.includes("Google US English")
-        );
-        if (friendlyVoice) utterance.voice = friendlyVoice;
-        synth.speak(utterance);
-    }
 
     /**
      * Announces a word using only dictionaryapi.dev audio (no TTS fallback).
@@ -317,10 +286,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }));
         window.wordList = wordList;
 
-        // Prefetch audio for the first 3 words
-        for (let i = 0; i < Math.min(3, wordList.length); i++) {
-            prefetchAudio(wordList[i].word);
-        }
 
         let initialMessage = `Successfully loaded ${wordList.length} words! Let's get spelling! ✨`;
         if (missing.length > 0) {
@@ -367,13 +332,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Delay the announcement slightly for a better user experience
             setTimeout(() => {
-                announceWord(currentWord);
+                announceWordWithDictApi(currentWord);
                 spellingInput.focus();
-
-                // Prefetch audio for the next word
-                if (currentWordIndex + 1 < wordList.length) {
-                    prefetchAudio(wordList[currentWordIndex + 1].word);
-                }
             }, 500);
         } else {
             showSummary();
@@ -454,7 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
      */
     async function getWordMeaning(word) {
         wordMeaningDisplay.style.display = "block";
-        wordMeaningDisplay.innerHTML = `<p class="font-bold text-center">Loading meaning...</p>`;
+        wordMeaningDisplay.innerHTML = `<p class=\"font-bold text-center\">Loading meaning...</p>`;
 
         try {
             const response = await fetch(
@@ -474,15 +434,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 const definition = firstMeaning.definitions[0].definition;
                 const partOfSpeech = firstMeaning.partOfSpeech;
                 wordMeaningDisplay.innerHTML = `
-									<p><span class="font-bold">${partOfSpeech}</span></p>
-									<p class="mt-1">${definition}</p>
-							`;
+								<p><span class=\"font-bold\">${partOfSpeech}</span></p>
+								<p class=\"mt-1\">${definition}</p>
+						`;
             } else {
                 throw new Error("Definition not available.");
             }
         } catch (error) {
             console.error("Error fetching definition:", error);
-            wordMeaningDisplay.innerHTML = `<p class="text-red-500 text-center">Could not find a definition. Please try another word.</p>`;
+            wordMeaningDisplay.innerHTML = `<p class=\"text-red-500 text-center\">Could not find a definition. Please try another word.</p>`;
+        }
+        // Always refocus the spelling input after meaning lookup
+        if (typeof spellingInput !== 'undefined' && spellingInput && typeof spellingInput.focus === 'function') {
+            spellingInput.focus();
         }
     }
 
@@ -549,9 +513,23 @@ document.addEventListener("DOMContentLoaded", () => {
             incorrectSynth.triggerAttackRelease("4n");
             wordList[currentWordIndex].correct = false;
             wordList[currentWordIndex].spelledWord = userSpelling;
-            // Save misspelled word to Supabase if available
-            if (typeof saveMisspelledWord === 'function') {
-                saveMisspelledWord(currentWord);
+            // No per-word Supabase update; batch at end of quiz
+        }
+    }
+    // Batch save all misspelled words to Supabase at the end of the quiz
+    function batchSaveMisspelledWords() {
+        if (typeof saveMisspelledWordsBatch === 'function' && typeof currentUser !== 'undefined' && currentUser) {
+            // Collect all incorrect words and their counts for this session
+            const misspelledMap = {};
+            wordList.forEach(item => {
+                if (item.correct === false && item.word) {
+                    if (!misspelledMap[item.word]) misspelledMap[item.word] = 0;
+                    misspelledMap[item.word]++;
+                }
+            });
+            const misspelledArray = Object.entries(misspelledMap).map(([word, count]) => ({ word, count }));
+            if (misspelledArray.length > 0) {
+                saveMisspelledWordsBatch(misspelledArray);
             }
         }
     }
@@ -652,15 +630,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // New: Event listener for the space bar
-    document.addEventListener("keydown", (event) => {
-        if (event.code === "Space" && isQuizActive) {
-            // Prevent the default space bar action (e.g., scrolling)
-            event.preventDefault();
-            // Trigger a click on the repeat button
-            repeatButton.click();
-        }
-    });
 
     nextButton.addEventListener("click", () => {
         // If the quiz hasn't started, start it
@@ -710,6 +679,7 @@ document.addEventListener("DOMContentLoaded", () => {
             attemptedWords++;
         }
         showSummary();
+        batchSaveMisspelledWords();
     });
 
     playAgainButton.addEventListener("click", resetApp);

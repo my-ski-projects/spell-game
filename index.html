@@ -303,8 +303,13 @@ Spelling Bee Game Features:
       .quiz-buttons-grid {
         width: 100%;
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         gap: 1rem;
+      }
+      @media (min-width: 768px) {
+        .quiz-buttons-grid {
+          grid-template-columns: 1fr 1fr;
+        }
       }
 
       /* Make inputs and buttons fill their grid/flex containers */
@@ -419,18 +424,21 @@ Spelling Bee Game Features:
         >
           <input
             id="user-id-input"
-            class="input-text w-full mb-2"
+            class="input-text w-full md:w-3/5 text-center md:text-left"
             placeholder="Enter your User ID to track mistakes"
             autocomplete="off"
           />
-          <button id="load-mistakes-button" class="button-secondary w-full">
+          <button
+            id="load-mistakes-button"
+            class="button-secondary w-full md:w-2/5"
+          >
             Load My Misspelled Words
           </button>
-          <div
-            id="misspelled-words-list"
-            class="mt-2 text-sm text-left w-full"
-          ></div>
         </div>
+        <div
+          id="misspelled-words-list"
+          class="mt-2 text-sm text-left w-full"
+        ></div>
       </div>
 
       <!-- Quiz Controls & Display -->
@@ -450,11 +458,14 @@ Spelling Bee Game Features:
           id="spelling-input"
           placeholder="Your spelling here..."
           class="input-text w-full mb-4"
+          autocomplete="off"
         />
 
         <div class="quiz-buttons-grid">
           <button id="next-button" class="button-primary">Let's Go! 👉</button>
-          <div class="flex flex-row gap-2 items-center justify-center w-full">
+          <div
+            class="flex flex-col md:flex-row gap-2 items-center justify-center w-full"
+          >
             <button id="repeat-dictapi-button" class="button-secondary w-full">
               Repeat (1) 🎧
             </button>
@@ -531,67 +542,6 @@ Spelling Bee Game Features:
               "</ul>";
           }
         });
-      });
-    </script>
-    <script>
-      // Robust event listeners for repeat buttons
-      document.addEventListener("DOMContentLoaded", function () {
-        function getCurrentWord() {
-          if (
-            window.wordList &&
-            typeof window.currentWordIndex === "number" &&
-            window.currentWordIndex < window.wordList.length
-          ) {
-            return window.wordList[window.currentWordIndex].word;
-          }
-          // Fallback: try to get from quiz area
-          const quizArea = document.getElementById("quiz-area");
-          if (quizArea && !quizArea.classList.contains("hidden")) {
-            const wordDisplay = document.getElementById("word-display");
-            if (
-              wordDisplay &&
-              wordDisplay.textContent &&
-              wordDisplay.textContent !== "..."
-            ) {
-              return wordDisplay.textContent.trim();
-            }
-          }
-          return "";
-        }
-        function setupRepeatButtons() {
-          const repeatDictApiBtn = document.getElementById(
-            "repeat-dictapi-button"
-          );
-          const repeatTtsBtn = document.getElementById("repeat-tts-button");
-          if (repeatDictApiBtn) {
-            repeatDictApiBtn.onclick = function () {
-              const word = getCurrentWord();
-              console.log("[Repeat-DictApi] Clicked. Word:", word);
-              if (!word) {
-                alert("No word to repeat!");
-                return;
-              }
-              if (typeof announceWordWithDictApi === "function")
-                announceWordWithDictApi(word);
-            };
-          }
-          if (repeatTtsBtn) {
-            repeatTtsBtn.onclick = function () {
-              const word = getCurrentWord();
-              console.log("[Repeat-TTS] Clicked. Word:", word);
-              if (!word) {
-                alert("No word to repeat!");
-                return;
-              }
-              if (typeof announceWordWithTTS === "function")
-                announceWordWithTTS(word);
-            };
-          }
-        }
-        setupRepeatButtons();
-        // In case quiz area is re-rendered, re-setup buttons
-        const observer = new MutationObserver(setupRepeatButtons);
-        observer.observe(document.body, { childList: true, subtree: true });
       });
     </script>
     <script src="./spell-game.js"></script>
