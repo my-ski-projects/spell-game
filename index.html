@@ -427,7 +427,7 @@ Spelling Bee Game Features:
             class="input-text w-full md:w-3/5 text-center md:text-left"
             placeholder="Enter your User ID to track mistakes"
             autocomplete="off"
-            style="display:none;"
+            style="display: none"
             value="fox"
           />
           <button
@@ -435,6 +435,13 @@ Spelling Bee Game Features:
             class="button-secondary w-full md:w-2/5"
           >
             Show My Misspelled Words
+          </button>
+          <button
+            id="practice-mistakes-button"
+            class="button-primary w-full md:w-2/5 mt-2 md:mt-0"
+            style="margin-left:0.5rem;"
+          >
+            Practice My Misspelled Words
           </button>
         </div>
         <div
@@ -546,6 +553,23 @@ Spelling Bee Game Features:
         });
       });
     </script>
-    <script src="./spell-game.js"></script>
+  <script src="./practice-mistakes.js"></script>
+  <script src="./spell-game.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const practiceBtn = document.getElementById("practice-mistakes-button");
+        if (practiceBtn && typeof window.loadAndPracticeMisspelledWords === 'function') {
+          practiceBtn.addEventListener("click", window.loadAndPracticeMisspelledWords);
+        } else if (practiceBtn) {
+          practiceBtn.addEventListener("click", function() {
+            if (typeof window.loadAndPracticeMisspelledWords === 'function') {
+              window.loadAndPracticeMisspelledWords();
+            } else {
+              alert('Practice function not loaded.');
+            }
+          });
+        }
+      });
+    </script>
   </body>
 </html>

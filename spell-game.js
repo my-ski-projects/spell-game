@@ -1,4 +1,27 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Loads user's misspelled words from Supabase and starts a quiz with them
+    async function loadAndPracticeMisspelledWords() {
+        if (typeof getMisspelledWords !== 'function' || typeof loadAndStartQuiz !== 'function') {
+            alert('Required functions are not loaded.');
+            return;
+        }
+        if (!window.currentUser) {
+            alert('No user ID set.');
+            return;
+        }
+        const data = await getMisspelledWords();
+        if (!data || data.length === 0) {
+            alert('No misspelled words found for this user!');
+            return;
+        }
+        // Use only the word field, unique, sorted by most mistakes first
+        const sorted = data
+            .filter(row => row.word)
+            .sort((a, b) => (b.mistake_count || 0) - (a.mistake_count || 0));
+        const words = sorted.map(row => row.word);
+        loadAndStartQuiz(words);
+    }
+    window.loadAndPracticeMisspelledWords = loadAndPracticeMisspelledWords;
     // Default user to 'fox' and hide the input box
     const userIdInput = document.getElementById('user-id-input');
     window.currentUser = 'fox';
@@ -9,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
             initSupabase('fox');
         }
         // Listen for changes to userIdInput to update currentUser/initSupabase
-        userIdInput.addEventListener('change', function(e) {
+        userIdInput.addEventListener('change', function (e) {
             const newUser = userIdInput.value.trim() || 'fox';
             window.currentUser = newUser;
             if (typeof initSupabase === 'function') {
@@ -19,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Show userId input on key '0' (zero) if not already visible, and prevent passing keystroke to input
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         if (e.key === '0' && userIdInput) {
             if (userIdInput.style.display === 'none') {
                 userIdInput.style.display = '';
@@ -298,7 +321,7 @@ document.addEventListener("DOMContentLoaded", () => {
      * @param {Array<string>} missing - An array of letters for which word lists were not found.
      */
     function loadAndStartQuiz(words, missing = []) {
-    // Always use currentUser (default 'fox' or changed by user)
+        // Always use currentUser (default 'fox' or changed by user)
         if (!words || words.length === 0) {
             statusMessage.textContent = "No words found for this selection. 🙁";
             return;
