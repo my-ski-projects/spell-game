@@ -1,4 +1,37 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Default user to 'fox' and hide the input box
+    const userIdInput = document.getElementById('user-id-input');
+    window.currentUser = 'fox';
+    if (userIdInput) {
+        userIdInput.value = 'fox';
+        userIdInput.style.display = 'none';
+        if (typeof initSupabase === 'function') {
+            initSupabase('fox');
+        }
+        // Listen for changes to userIdInput to update currentUser/initSupabase
+        userIdInput.addEventListener('change', function(e) {
+            const newUser = userIdInput.value.trim() || 'fox';
+            window.currentUser = newUser;
+            if (typeof initSupabase === 'function') {
+                initSupabase(newUser);
+            }
+        });
+    }
+
+    // Show userId input on key '0' (zero) if not already visible, and prevent passing keystroke to input
+    document.addEventListener('keydown', function(e) {
+        if (e.key === '0' && userIdInput) {
+            if (userIdInput.style.display === 'none') {
+                userIdInput.style.display = '';
+                userIdInput.focus();
+                userIdInput.select();
+            } else {
+                userIdInput.style.display = 'none';
+                userIdInput.blur();
+            }
+            e.preventDefault();
+        }
+    });
     // (Reverted: No default user, no auto-hide, no auto-init)
     // Robust event listeners for repeat buttons (moved from index.html)
     function getCurrentWord() {
@@ -265,16 +298,7 @@ document.addEventListener("DOMContentLoaded", () => {
      * @param {Array<string>} missing - An array of letters for which word lists were not found.
      */
     function loadAndStartQuiz(words, missing = []) {
-        // Set currentUser and initialize Supabase for DB updates
-        const userIdInput = document.getElementById('user-id-input');
-        if (userIdInput && userIdInput.value.trim()) {
-            window.currentUser = userIdInput.value.trim();
-            if (typeof initSupabase === 'function') {
-                initSupabase(window.currentUser);
-            }
-        } else {
-            window.currentUser = undefined;
-        }
+    // Always use currentUser (default 'fox' or changed by user)
         if (!words || words.length === 0) {
             statusMessage.textContent = "No words found for this selection. 🙁";
             return;
