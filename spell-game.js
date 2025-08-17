@@ -1,8 +1,10 @@
-
 document.addEventListener("DOMContentLoaded", () => {
     // Global variables to manage the state of the app
     let wordList = [];
     let currentWordIndex = 0;
+    // Expose for repeat buttons in index.html
+    window.wordList = wordList;
+    window.currentWordIndex = currentWordIndex;
     let score = 0;
     let isQuizActive = false;
     let attemptedWords = 0; // Track total words attempted for the score
@@ -27,7 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const quizArea = document.getElementById("quiz-area");
     const progressCounter = document.getElementById("progress-counter");
     const nextButton = document.getElementById("next-button");
-    const repeatButton = document.getElementById("repeat-button");
     const endQuizButton = document.getElementById("end-quiz-button");
     const wordDisplay = document.getElementById("word-display");
     const feedback = document.getElementById("feedback");
@@ -220,6 +221,64 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /**
+     * Announces a word using only dictionaryapi.dev audio (no TTS fallback).
+     * @param {string} word
+     */
+    async function announceWordWithDictApi(word) {
+        if (!word) { console.log('[announceWordWithDictApi] No word provided'); return; }
+        // Cancel any ongoing speech
+        if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+        try {
+            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+            if (response.ok) {
+                const data = await response.json();
+                let audioUrl = null;
+                if (data && data[0] && data[0].phonetics) {
+                    const phonetic = data[0].phonetics.find((p) => p.audio);
+                    if (phonetic && phonetic.audio) {
+                        audioUrl = phonetic.audio;
+                    }
+                }
+                if (audioUrl) {
+                    console.log('[announceWordWithDictApi] Playing audio:', audioUrl);
+                    const audio = new Audio(audioUrl);
+                    audio.play().catch(e => { console.log('Audio play error:', e); });
+                    return;
+                } else {
+                    console.log('[announceWordWithDictApi] No audio found in API response for', word);
+                }
+            } else {
+                console.log('[announceWordWithDictApi] API response not ok for', word);
+            }
+        } catch (e) {
+            console.log('[announceWordWithDictApi] Fetch error:', e);
+        }
+        // If no audio found, do nothing (no TTS fallback)
+    }
+
+    /**
+     * Announces a word using browser TTS only (no dictionaryapi audio).
+     * @param {string} word
+     */
+    function announceWordWithTTS(word) {
+        if (!word) { console.log('[announceWordWithTTS] No word provided'); return; }
+        if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(word);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        const friendlyVoice = voices.find((voice) => voice.name.includes("Google US English"));
+        if (friendlyVoice) utterance.voice = friendlyVoice;
+        utterance.onstart = () => { console.log('[announceWordWithTTS] Speaking:', word, 'Voice:', friendlyVoice ? friendlyVoice.name : 'default'); };
+        utterance.onerror = (e) => { console.log('[announceWordWithTTS] Speech error:', e); };
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // Make these available globally for the inline script
+    window.announceWordWithDictApi = announceWordWithDictApi;
+    window.announceWordWithTTS = announceWordWithTTS;
+
+    /**
      * Shuffles an array in place using the Fisher-Yates algorithm.
      * @param {Array} array - The array to shuffle.
      */
@@ -256,6 +315,7 @@ document.addEventListener("DOMContentLoaded", () => {
             correct: null,
             spelledWord: "",
         }));
+        window.wordList = wordList;
 
         // Prefetch audio for the first 3 words
         for (let i = 0; i < Math.min(3, wordList.length); i++) {
@@ -272,6 +332,7 @@ document.addEventListener("DOMContentLoaded", () => {
         wordListButtons.classList.add("hidden");
 
         currentWordIndex = 0;
+        window.currentWordIndex = currentWordIndex;
         score = 0;
         attemptedWords = 0;
         shuffleArray(wordList);
@@ -292,6 +353,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function getNextWord() {
         // Only get the next word if the quiz isn't over.
         if (currentWordIndex < wordList.length) {
+            window.currentWordIndex = currentWordIndex;
             const currentWord = wordList[currentWordIndex].word;
             wordDisplay.textContent = "...";
             feedback.textContent = "";
@@ -431,6 +493,8 @@ document.addEventListener("DOMContentLoaded", () => {
         // Clear all state
         wordList = [];
         currentWordIndex = 0;
+        window.wordList = wordList;
+        window.currentWordIndex = currentWordIndex;
         score = 0;
         isQuizActive = false;
         attemptedWords = 0;
@@ -485,6 +549,10 @@ document.addEventListener("DOMContentLoaded", () => {
             incorrectSynth.triggerAttackRelease("4n");
             wordList[currentWordIndex].correct = false;
             wordList[currentWordIndex].spelledWord = userSpelling;
+            // Save misspelled word to Supabase if available
+            if (typeof saveMisspelledWord === 'function') {
+                saveMisspelledWord(currentWord);
+            }
         }
     }
 
@@ -602,6 +670,7 @@ document.addEventListener("DOMContentLoaded", () => {
             getNextWord();
             return;
         }
+        window.currentWordIndex = currentWordIndex;
 
         // Mark the current word as incorrect before skipping
         if (currentWordIndex < wordList.length) {
@@ -617,17 +686,7 @@ document.addEventListener("DOMContentLoaded", () => {
             showSummary();
         } else {
             getNextWord();
-        }
-    });
-
-    repeatButton.addEventListener("click", () => {
-        if (isQuizActive && currentWordIndex < wordList.length) {
-            announceWord(wordList[currentWordIndex].word);
-            // Fix: Re-focus the spelling input after the word is announced.
-            // A slight delay ensures the focus is set after the speech starts.
-            setTimeout(() => {
-                spellingInput.focus();
-            }, 100);
+            window.currentWordIndex = currentWordIndex;
         }
     });
 

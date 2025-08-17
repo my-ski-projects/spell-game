@@ -347,8 +347,6 @@ Spelling Bee Game Features:
   </head>
   <body>
     <div class="container">
-      <!-- Add this just inside <div class="container">, before the <h1> -->
-
       <h1 class="text-4xl font-bold mb-4">Spelling Quest! 🧙‍♀️</h1>
 
       <div id="status-message" class="text-gray-500 mb-4">
@@ -428,7 +426,10 @@ Spelling Bee Game Features:
           <button id="load-mistakes-button" class="button-secondary w-full">
             Load My Misspelled Words
           </button>
-          <div id="misspelled-words-list" class="mt-2 text-sm text-left w-full"></div>
+          <div
+            id="misspelled-words-list"
+            class="mt-2 text-sm text-left w-full"
+          ></div>
         </div>
       </div>
 
@@ -453,9 +454,14 @@ Spelling Bee Game Features:
 
         <div class="quiz-buttons-grid">
           <button id="next-button" class="button-primary">Let's Go! 👉</button>
-          <button id="repeat-button" class="button-secondary">
-            Repeat! 👂
-          </button>
+          <div class="flex flex-row gap-2 items-center justify-center w-full">
+            <button id="repeat-dictapi-button" class="button-secondary w-full">
+              Repeat (1) 🎧
+            </button>
+            <button id="repeat-tts-button" class="button-secondary w-full">
+              Repeat (2) 🗣️
+            </button>
+          </div>
           <!-- New: Meaning button for the main quiz area -->
           <button id="meaning-button" class="button-secondary">
             Meaning 🤔
@@ -485,32 +491,107 @@ Spelling Bee Game Features:
 
     <script>
       // Connect the user ID input and button to Supabase fetch
-      document.addEventListener('DOMContentLoaded', function() {
-        const userIdInput = document.getElementById('user-id-input');
-        const loadMistakesButton = document.getElementById('load-mistakes-button');
-        const misspelledWordsList = document.getElementById('misspelled-words-list');
+      document.addEventListener("DOMContentLoaded", function () {
+        const userIdInput = document.getElementById("user-id-input");
+        const loadMistakesButton = document.getElementById(
+          "load-mistakes-button"
+        );
+        const misspelledWordsList = document.getElementById(
+          "misspelled-words-list"
+        );
 
-        loadMistakesButton.addEventListener('click', async function() {
+        loadMistakesButton.addEventListener("click", async function () {
           const userId = userIdInput.value.trim();
           if (!userId) {
-            misspelledWordsList.textContent = 'Please enter your User ID.';
+            misspelledWordsList.textContent = "Please enter your User ID.";
             return;
           }
-          if (typeof initSupabase !== 'function' || typeof getMisspelledWords !== 'function') {
-            misspelledWordsList.textContent = 'Supabase not loaded.';
+          if (
+            typeof initSupabase !== "function" ||
+            typeof getMisspelledWords !== "function"
+          ) {
+            misspelledWordsList.textContent = "Supabase not loaded.";
             return;
           }
           window.currentUser = userId;
           initSupabase(userId);
-          misspelledWordsList.textContent = 'Loading...';
+          misspelledWordsList.textContent = "Loading...";
           const data = await getMisspelledWords();
           if (!data || data.length === 0) {
-            misspelledWordsList.textContent = 'No misspelled words found.';
+            misspelledWordsList.textContent = "No misspelled words found.";
           } else {
-            misspelledWordsList.innerHTML = '<b>Your misspelled words:</b><ul style="margin-top:4px;">' +
-              data.map(row => `<li>${row.word} <span style='color:#888'>(missed ${row.mistake_count}x)</span></li>`).join('') + '</ul>';
+            misspelledWordsList.innerHTML =
+              '<b>Your misspelled words:</b><ul style="margin-top:4px;">' +
+              data
+                .map(
+                  (row) =>
+                    `<li>${row.word} <span style='color:#888'>(missed ${row.mistake_count}x)</span></li>`
+                )
+                .join("") +
+              "</ul>";
           }
         });
+      });
+    </script>
+    <script>
+      // Robust event listeners for repeat buttons
+      document.addEventListener("DOMContentLoaded", function () {
+        function getCurrentWord() {
+          if (
+            window.wordList &&
+            typeof window.currentWordIndex === "number" &&
+            window.currentWordIndex < window.wordList.length
+          ) {
+            return window.wordList[window.currentWordIndex].word;
+          }
+          // Fallback: try to get from quiz area
+          const quizArea = document.getElementById("quiz-area");
+          if (quizArea && !quizArea.classList.contains("hidden")) {
+            const wordDisplay = document.getElementById("word-display");
+            if (
+              wordDisplay &&
+              wordDisplay.textContent &&
+              wordDisplay.textContent !== "..."
+            ) {
+              return wordDisplay.textContent.trim();
+            }
+          }
+          return "";
+        }
+        function setupRepeatButtons() {
+          const repeatDictApiBtn = document.getElementById(
+            "repeat-dictapi-button"
+          );
+          const repeatTtsBtn = document.getElementById("repeat-tts-button");
+          if (repeatDictApiBtn) {
+            repeatDictApiBtn.onclick = function () {
+              const word = getCurrentWord();
+              console.log("[Repeat-DictApi] Clicked. Word:", word);
+              if (!word) {
+                alert("No word to repeat!");
+                return;
+              }
+              if (typeof announceWordWithDictApi === "function")
+                announceWordWithDictApi(word);
+            };
+          }
+          if (repeatTtsBtn) {
+            repeatTtsBtn.onclick = function () {
+              const word = getCurrentWord();
+              console.log("[Repeat-TTS] Clicked. Word:", word);
+              if (!word) {
+                alert("No word to repeat!");
+                return;
+              }
+              if (typeof announceWordWithTTS === "function")
+                announceWordWithTTS(word);
+            };
+          }
+        }
+        setupRepeatButtons();
+        // In case quiz area is re-rendered, re-setup buttons
+        const observer = new MutationObserver(setupRepeatButtons);
+        observer.observe(document.body, { childList: true, subtree: true });
       });
     </script>
     <script src="./spell-game.js"></script>

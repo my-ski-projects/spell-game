@@ -22,29 +22,43 @@ function initSupabase(userId) {
 }
 
 /**
- * Insert or update a misspelled word for the current user
- * @param {string} word - The misspelled word
+ * Save a misspelled word (upsert with mistake count increment)
  */
 async function saveMisspelledWord(word) {
-    if (!supabase) {
-        console.error('Supabase not initialized. Call initSupabase(userId) first.');
+    if (!supabase || !currentUser) {
+        console.error('Supabase not initialized or missing user.');
         return;
     }
 
+    // Step 1: Check if word already exists
     const { data, error } = await supabase
         .from('misspelled_words')
+        .select('mistake_count')
+        .eq('user_id', currentUser)
+        .eq('word', word)
+        .single();
+
+    let mistakeCount = 1;
+
+    if (data) {
+        mistakeCount = data.mistake_count + 1;
+    }
+
+    // Step 2: Insert or update with incremented count
+    const { error: upsertError } = await supabase
+        .from('misspelled_words')
         .upsert({
-            user_id: currentUser,         // Assumes currentUser is declared globally
+            user_id: currentUser,
             word: word,
-            mistake_count: 1
+            mistake_count: mistakeCount
         }, {
             onConflict: ['user_id', 'word']
         });
 
-    if (error) {
-        console.error('Error saving word:', error.message);
+    if (upsertError) {
+        console.error('Upsert error:', upsertError.message);
     } else {
-        console.log('Saved:', data);
+        console.log(`Saved "${word}" for ${currentUser} with count ${mistakeCount}`);
     }
 }
 
@@ -59,7 +73,8 @@ async function getMisspelledWords() {
 
     const { data, error } = await supabase
         .from('misspelled_words')
-        .select('*');
+        .select('*')
+        .eq('user_id', currentUser);
 
     if (error) {
         console.error('Error fetching words:', error.message);
