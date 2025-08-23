@@ -1,4 +1,14 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Get folder param from URL if present
+    function getWordFolderFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const folder = params.get('f');
+        if (folder && /^[\w\-\/]+$/.test(folder)) {
+            return folder.replace(/\/+$/, ''); // Remove trailing slash
+        }
+        return '';
+    }
+    const WORD_FOLDER = getWordFolderFromUrl();
     // Loads user's misspelled words from Supabase and starts a quiz with them
     async function loadAndPracticeMisspelledWords() {
         if (typeof getMisspelledWords !== 'function' || typeof loadAndStartQuiz !== 'function') {
@@ -181,13 +191,13 @@ document.addEventListener("DOMContentLoaded", () => {
      */
     async function fetchWordList(letter) {
         try {
-            const response = await fetch(`${letter}.txt`);
+            // Use folder param if present, else current folder
+            const filePath = WORD_FOLDER ? `${WORD_FOLDER}/${letter}.txt` : `${letter}.txt`;
+            const response = await fetch(filePath);
             if (!response.ok) {
-                // If the file doesn't exist, response.ok will be false (e.g., 404 error)
-                throw new Error(`File not found: ${letter}.txt`);
+                throw new Error(`File not found: ${filePath}`);
             }
             const text = await response.text();
-            // Split the text into an array, filter out any empty lines, and trim whitespace
             return text
                 .split("\n")
                 .filter((word) => word.trim() !== "")

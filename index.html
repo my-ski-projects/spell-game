@@ -439,7 +439,7 @@ Spelling Bee Game Features:
           <button
             id="practice-mistakes-button"
             class="button-primary w-full md:w-2/5 mt-2 md:mt-0"
-            style="margin-left:0.5rem;"
+            style="margin-left: 0.5rem"
           >
             Practice My Misspelled Words
           </button>
@@ -540,9 +540,11 @@ Spelling Bee Game Features:
           if (!data || data.length === 0) {
             misspelledWordsList.textContent = "No misspelled words found.";
           } else {
+            // Sort alphabetically by word
+            const sorted = [...data].sort((a, b) => a.word.localeCompare(b.word));
             misspelledWordsList.innerHTML =
               '<b>Your misspelled words:</b><ul style="margin-top:4px;">' +
-              data
+              sorted
                 .map(
                   (row) =>
                     `<li>${row.word} <span style='color:#888'>(missed ${row.mistake_count}x)</span></li>`
@@ -553,19 +555,25 @@ Spelling Bee Game Features:
         });
       });
     </script>
-  <script src="./practice-mistakes.js"></script>
-  <script src="./spell-game.js"></script>
+    <script src="./practice-mistakes.js"></script>
+    <script src="./spell-game.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", function () {
         const practiceBtn = document.getElementById("practice-mistakes-button");
-        if (practiceBtn && typeof window.loadAndPracticeMisspelledWords === 'function') {
-          practiceBtn.addEventListener("click", window.loadAndPracticeMisspelledWords);
+        if (
+          practiceBtn &&
+          typeof window.loadAndPracticeMisspelledWords === "function"
+        ) {
+          practiceBtn.addEventListener(
+            "click",
+            window.loadAndPracticeMisspelledWords
+          );
         } else if (practiceBtn) {
-          practiceBtn.addEventListener("click", function() {
-            if (typeof window.loadAndPracticeMisspelledWords === 'function') {
+          practiceBtn.addEventListener("click", function () {
+            if (typeof window.loadAndPracticeMisspelledWords === "function") {
               window.loadAndPracticeMisspelledWords();
             } else {
-              alert('Practice function not loaded.');
+              alert("Practice function not loaded.");
             }
           });
         }

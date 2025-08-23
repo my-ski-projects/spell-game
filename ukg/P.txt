@@ -1,0 +1,8 @@
+pan
+pet
+pig
+pot
+pull
+park
+play
+page

@@ -1,0 +1,8 @@
+tap
+ten
+tie
+toy
+two
+that
+this
+them
