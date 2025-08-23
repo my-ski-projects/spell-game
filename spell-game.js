@@ -582,7 +582,10 @@ document.addEventListener("DOMContentLoaded", () => {
             score++;
 
             if (currentWordIndex === wordList.length - 1) {
-                setTimeout(() => showSummary(), 1500);
+                setTimeout(() => {
+                    showSummary();
+                    batchSaveMisspelledWords();
+                }, 1500);
             } else {
                 setTimeout(() => {
                     currentWordIndex++;
@@ -740,6 +743,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (currentWordIndex >= wordList.length) {
             showSummary();
+            batchSaveMisspelledWords();
         } else {
             getNextWord();
             window.currentWordIndex = currentWordIndex;
